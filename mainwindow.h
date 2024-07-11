@@ -3,7 +3,10 @@
 
 #include <QMainWindow>
 #include <QtBluetooth/QBluetoothDeviceDiscoveryAgent>
+#include <QtBluetooth/QLowEnergyController>
+#include <QStandardItemModel>
 
+#include "model.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -21,10 +24,17 @@ public:
 
 private:
     Ui::MainWindow *ui;
+    Model *model;
+    QStandardItemModel *msgsModel;
 
 public slots:
-    void ble(bool clicked);
-    void scanFinished();
-    void addDevice(const QBluetoothDeviceInfo &device);
+    // For model
+    void timeUpdated(quint64 ticks);
+    void cpuUsageUpdated(double usage_perc);
+    void connStatusUpdated(ConnStatus conn_status);
+    void msgReceived(quint64 tick, const QString &str);
+    void cmdSendStart();
+    void cmdSendFinish(quint64 tick);
+    // For controller
 };
 #endif // MAINWINDOW_H
