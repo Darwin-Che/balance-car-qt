@@ -15,7 +15,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->tableView_msgs->setModel(msgsModel);
     ui->tableView_msgs->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-    ui->tableView_msgs->setColumnWidth(0, 50);
+    ui->tableView_msgs->setColumnWidth(0, 60);
 
     model = new Model();
 
@@ -24,7 +24,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(model, &Model::connStatusUpdated, this, &MainWindow::connStatusUpdated);
     connect(model, &Model::msgReceived, this, &MainWindow::msgReceived);
     connect(ui->lineedit_msgs, &QLineEdit::returnPressed, this, &MainWindow::cmdSendStart);
-    connect(model, &Model::cmdSendFinish, this, &MainWindow::cmdSendFinish);
+    connect(model, &Model::cmdAck, this, &MainWindow::cmdSendFinish);
 
     connect(ui->btn_connect, &QPushButton::released, model, &Model::connectDevice);
 }
@@ -72,20 +72,20 @@ void MainWindow::msgReceived(quint64 tick, const QString &msg) {
 
 void MainWindow::cmdSendStart() {
     auto msg = ui->lineedit_msgs->text();
-    emit model->cmdSend(msg);
+
+    emit model->cmdSend(msgsModel->rowCount(), msg);
 
     ui->lineedit_msgs->clear();
     msgsModel->appendRow({new QStandardItem(""), new QStandardItem(msg)});
 }
 
-void MainWindow::cmdSendFinish(quint64 tick) {
-    // the last command should be within the last 32 logs
-    auto l = msgsModel->rowCount();
-    for (int row = 0; row < 16; row += 1) {
-        auto r = l - 1 - row;
-        if (msgsModel->item(r, 0)->data(Qt::DisplayRole) == "") {
-            msgsModel->setItem(r, 0, new QStandardItem(QString::number(tick)));
-            return;
-        }
-    }
+void MainWindow::cmdSendFinish(quint64 id, quint64 tick) {
+    quint32 msec = tick % 100;
+    quint32 sec = (tick / 100) % 60;
+    quint32 min = (tick / 100) / 60;
+    auto output = QString("%1:%2.%3")
+                      .arg(min, 2, 10, QLatin1Char('0'))
+                      .arg(sec, 2, 10, QLatin1Char('0'))
+                      .arg(msec, 2, 10, QLatin1Char('0'));
+    msgsModel->setItem(id, 0, new QStandardItem(output));
 }

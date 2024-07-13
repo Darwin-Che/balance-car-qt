@@ -34,7 +34,7 @@ public slots:
     void connStatusUpdated(ConnStatus conn_status);
     void msgReceived(quint64 tick, const QString &str);
     void cmdSendStart();
-    void cmdSendFinish(quint64 tick);
+    void cmdSendFinish(quint64 id, quint64 tick);
     // For controller
 };
 #endif // MAINWINDOW_H

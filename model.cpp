@@ -6,6 +6,9 @@ Model::Model()
     , m_service(NULL)
     , m_time()
     , m_cpu_usage()
+    , m_cmd_input()
+    , m_cmd_ack()
+    , m_msg()
 {
     m_discovery = new QBluetoothDeviceDiscoveryAgent();
     m_discovery->setLowEnergyDiscoveryTimeout(15000);
@@ -103,6 +106,12 @@ void Model::serviceStateChanged(QLowEnergyService::ServiceState newState) {
                     m_time = charac;
                 } else if (descriptor_name.value() == QString::fromUtf8("CPU Usage")) {
                     m_cpu_usage = charac;
+                } else if (descriptor_name.value() == QString::fromUtf8("Cmd Input")) {
+                    m_cmd_input = charac;
+                } else if (descriptor_name.value() == QString::fromUtf8("Cmd Ack")) {
+                    m_cmd_ack = charac;
+                } else if (descriptor_name.value() == QString::fromUtf8("Msg")) {
+                    m_msg = charac;
                 }
             }
 
@@ -119,15 +128,30 @@ void Model::serviceStateChanged(QLowEnergyService::ServiceState newState) {
 }
 
 void Model::characteristicChanged(const QLowEnergyCharacteristic &charac, const QByteArray &newValue) {
-    qInfo() << "[BLE] characteristicChanged " << charac.uuid() << newValue;
+    // qInfo() << "[B LE] characteristicChanged " << charac.uuid() << newValue;
     if (charac.uuid() == m_time.uuid()) {
         emit timeUpdated(qFromLittleEndian<quint64>(newValue));
     } else if (charac.uuid() == m_cpu_usage.uuid()) {
         emit cpuUsageUpdated(100 - ((double) qFromLittleEndian<quint64>(newValue)) / 100.0);
+    } else if (charac.uuid() == m_cmd_ack.uuid()) {
+        quint64 id, tick;
+        memcpy(&id, newValue.constData(), 8);
+        memcpy(&tick, newValue.constData() + 8, 8);
+        if (id == 0 && tick == 0) {
+            // Skip this
+        } else {
+            emit cmdAck(id, tick);
+        }
     }
 }
 
-void Model::cmdSend(const QString & msg) {
+void Model::cmdSend(quint64 id, const QString & msg) {
+    auto bytes = QByteArray();
 
+    id = qToLittleEndian(id);
+    bytes.append(reinterpret_cast<const char*>(&id), sizeof(id));
+    bytes.append(msg.toUtf8());
+
+    m_service->writeCharacteristic(m_cmd_input, bytes);
 }
 

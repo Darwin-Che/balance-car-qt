@@ -27,6 +27,9 @@ private:
 
     QLowEnergyCharacteristic m_time;
     QLowEnergyCharacteristic m_cpu_usage;
+    QLowEnergyCharacteristic m_cmd_input;
+    QLowEnergyCharacteristic m_cmd_ack;
+    QLowEnergyCharacteristic m_msg;
 
 public slots:
     void scanFinished();
@@ -38,14 +41,14 @@ public slots:
     void characteristicChanged(const QLowEnergyCharacteristic &characteristic, const QByteArray &newValue);
 
     void connectDevice();
-    void cmdSend(const QString & msg);
+    void cmdSend(quint64 id, const QString & msg);
 
 signals:
     void connStatusUpdated(ConnStatus conn_status);
     void timeUpdated(quint64 tick);
     void cpuUsageUpdated(double cpu_usage);
     void msgReceived(quint64 tick, const QString & msg);
-    void cmdSendFinish(quint64 tick);
+    void cmdAck(quint64 id, quint64 tick);
 };
 
 #endif // MODEL_H

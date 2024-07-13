@@ -96,7 +96,7 @@
    <widget class="QLineEdit" name="lineedit_msgs">
     <property name="geometry">
      <rect>
-      <x>460</x>
+      <x>470</x>
       <y>520</y>
       <width>421</width>
       <height>21</height>
