@@ -1,4 +1,4 @@
-#ifndef MODEL_H
+﻿#ifndef MODEL_H
 #define MODEL_H
 
 #include <QObject>
@@ -6,6 +6,8 @@
 #include <QtBluetooth/QBluetoothDeviceDiscoveryAgent>
 #include <QtBluetooth/QLowEnergyController>
 #include <QtBluetooth/QLowEnergyService>
+
+#include "imu.h"
 
 enum class ConnStatus
 {
@@ -30,6 +32,8 @@ private:
     QLowEnergyCharacteristic m_cmd_input;
     QLowEnergyCharacteristic m_cmd_ack;
     QLowEnergyCharacteristic m_msg;
+    QLowEnergyCharacteristic m_imu;
+    QLowEnergyCharacteristic m_encoder;
 
 public slots:
     void scanFinished();
@@ -46,9 +50,11 @@ public slots:
 signals:
     void connStatusUpdated(ConnStatus conn_status);
     void timeUpdated(quint64 tick);
-    void cpuUsageUpdated(double cpu_usage);
+    void cpuUsageUpdated(quint64 tick, double cpu_usage);
     void msgReceived(quint64 tick, const QString & msg);
     void cmdAck(quint64 id, quint64 tick);
+    void imuUpdated(quint64 tick, const Imu & imu);
+    void encoderUpdated(quint64 tick, qreal left_rps, qreal right_rps);
 };
 
 #endif // MODEL_H

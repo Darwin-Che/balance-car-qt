@@ -9,6 +9,8 @@ Model::Model()
     , m_cmd_input()
     , m_cmd_ack()
     , m_msg()
+    , m_imu()
+    , m_encoder()
 {
     m_discovery = new QBluetoothDeviceDiscoveryAgent();
     m_discovery->setLowEnergyDiscoveryTimeout(15000);
@@ -99,9 +101,10 @@ void Model::serviceStateChanged(QLowEnergyService::ServiceState newState) {
         return;
     case QLowEnergyService::RemoteServiceDiscovered:
         Q_FOREACH(QLowEnergyCharacteristic charac, m_service->characteristics()) {
-            qInfo() << "[BLE] charac " << charac.name() << charac.value() << charac.properties() << charac.uuid();
+            // qInfo() << "[BLE] charac " << charac.name() << charac.value() << charac.properties() << charac.uuid();
             auto descriptor_name = charac.descriptor(QBluetoothUuid::DescriptorType::CharacteristicUserDescription);
             if (descriptor_name.isValid()) {
+                qInfo() << "[BLE] Found " << descriptor_name.value();
                 if (descriptor_name.value() == QString::fromUtf8("Clock")) {
                     m_time = charac;
                 } else if (descriptor_name.value() == QString::fromUtf8("CPU Usage")) {
@@ -112,15 +115,22 @@ void Model::serviceStateChanged(QLowEnergyService::ServiceState newState) {
                     m_cmd_ack = charac;
                 } else if (descriptor_name.value() == QString::fromUtf8("Msg")) {
                     m_msg = charac;
+                } else if (descriptor_name.value() == QString::fromUtf8("Imu")) {
+                    m_imu = charac;
+                } else if (descriptor_name.value() == QString::fromUtf8("Encoder")) {
+                    m_encoder = charac;
                 }
             }
 
             auto descriptor_cccd = charac.descriptor(QBluetoothUuid::DescriptorType::ClientCharacteristicConfiguration);
             if (descriptor_cccd.isValid()) {
-                if (charac.properties() & QLowEnergyCharacteristic::Notify)
+                if (charac.properties() & QLowEnergyCharacteristic::Notify) {
+                    qInfo() << "[BLE] Start Notify " << descriptor_name.value();
                     m_service->writeDescriptor(descriptor_cccd, QLowEnergyCharacteristic::CCCDEnableNotification);
-                else if (charac.properties() & QLowEnergyCharacteristic::Indicate)
+                } else if (charac.properties() & QLowEnergyCharacteristic::Indicate) {
+                    qInfo() << "[BLE] Start Indicate " << descriptor_name.value();
                     m_service->writeDescriptor(descriptor_cccd, QLowEnergyCharacteristic::CCCDEnableIndication);
+                }
             }
         }
         return;
@@ -128,20 +138,58 @@ void Model::serviceStateChanged(QLowEnergyService::ServiceState newState) {
 }
 
 void Model::characteristicChanged(const QLowEnergyCharacteristic &charac, const QByteArray &newValue) {
-    // qInfo() << "[B LE] characteristicChanged " << charac.uuid() << newValue;
+    auto len = newValue.length();
+    // qInfo() << "[BLE] characteristicChanged " << charac.uuid() << newValue;
+
+    QDataStream data(newValue);
+    data.setByteOrder(QDataStream::LittleEndian);
+
     if (charac.uuid() == m_time.uuid()) {
-        emit timeUpdated(qFromLittleEndian<quint64>(newValue));
+        quint64 tick;
+        data >> tick;
+        emit timeUpdated(tick);
+
     } else if (charac.uuid() == m_cpu_usage.uuid()) {
-        emit cpuUsageUpdated(100 - ((double) qFromLittleEndian<quint64>(newValue)) / 100.0);
-    } else if (charac.uuid() == m_cmd_ack.uuid()) {
+        quint64 tick, perc;
+        data >> tick >> perc;
+        emit cpuUsageUpdated(tick, 100 - ((double) perc) / 100.0);
+
+    } else if (charac.uuid() == m_cmd_ack.uuid()) {        
         quint64 id, tick;
-        memcpy(&id, newValue.constData(), 8);
-        memcpy(&tick, newValue.constData() + 8, 8);
+        data >> id;
+        data >> tick;
         if (id == 0 && tick == 0) {
             // Skip this
         } else {
             emit cmdAck(id, tick);
         }
+
+    } else if (charac.uuid() == m_msg.uuid()) {
+        quint64 tick;
+        data >> tick;
+
+        QString msg = QString::fromUtf8(newValue.mid(8));
+
+        qInfo() << "[BLE] MSG " << tick << " " << msg << len;
+
+        emit msgReceived(tick, msg);
+
+    } else if (charac.uuid() == m_imu.uuid()) {
+        quint64 tick;
+        data >> tick;
+
+        Imu imu;
+        data >> imu.yaw >> imu.pitch >> imu.roll >> imu.x_accel >> imu.y_accel >> imu.z_accel;
+
+        emit imuUpdated(tick, imu);
+
+    } else if (charac.uuid() == m_encoder.uuid()) {
+        quint64 tick;
+        qreal left_rps, right_rps;
+        data >> tick >> left_rps >> right_rps;
+
+        emit encoderUpdated(tick, left_rps, right_rps);
+
     }
 }
 
